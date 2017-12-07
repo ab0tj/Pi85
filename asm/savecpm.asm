@@ -1,3 +1,9 @@
+; ***************************************
+; quick and dirty routine that
+; saves memory from 'ccp' until ffff
+; to disk0 starting at t0s2
+; ***************************************
+
 shm_base equ 0fff0h
 shm_chrin equ shm_base
 shm_cmd equ shm_base + 1

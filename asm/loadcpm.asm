@@ -1,3 +1,10 @@
+; ***************************************
+; quick and dirty routine that
+; loads numsects sectors from disk 0
+; starting at t0s2, into memory at ccp
+; ***************************************
+
+
 shm_base equ 0fff0h
 shm_chrin equ shm_base
 shm_cmd equ shm_base + 1

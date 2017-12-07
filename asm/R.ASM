@@ -1,3 +1,7 @@
+;***************************************************
+; Read a file into CP/M from the Pi's filesystem
+;***************************************************
+
 ; PI85 STUFF
 SHM$BASE 			EQU 0FFF0H
 SHM$CHRIN 			EQU SHM$BASE
@@ -46,76 +50,76 @@ ORG 100H
 
 	LXI SP, STACK
 	
-	MVI A, 'r'
-	STA BUFF+1
+	MVI A, 'r'			; read mode (pi side)
+	STA BUFF+1			; save to buffer
 	LXI H, BUFF
-	SHLD SHM$DATA
+	SHLD SHM$DATA		; tell the pi where to find filename
 	MVI A, CMD$OPENF
-	CALL DOCMD
+	CALL DOCMD			; open the file on the pi side
 	LDA SHM$DATA
-	ANA A
+	ANA A				; 0=success
 	JZ OPENLCL
-	LXI H, STR$REMERR
+	LXI H, STR$REMERR	; print error and quit if failure
 	CALL STROUT
 	RST 0
 	
 OPENLCL:
 	LXI D, FCB
-	MVI C, DELF
+	MVI C, DELF			; delete cp/m side file if it exists
 	CALL BDOS
 	LXI D, FCB
-	MVI C, MAKEF
+	MVI C, MAKEF		; create cp/m side file
 	CALL BDOS
-	INR A
+	INR A				; 0xff = failure
 	JNZ DOXFER
 	LXI H, STR$LCLERR
-	CALL STROUT
-	MVI A, CMD$CLOSEF
+	CALL STROUT			; print error string
+	MVI A, CMD$CLOSEF	; close pi side file
 	CALL DOCMD
-	RST 0
+	RST 0				; return to cp/m
 	
 DOXFER:
 	LXI D, BUFF
-	MVI C, SETDMA
+	MVI C, SETDMA		; dma addr = buffer area
 	CALL BDOS
 	
 XFERLP:
-	MVI A, CMD$READF
+	MVI A, CMD$READF	; read a block from pi side
 	CALL DOCMD
-	LDA SHM$DATA
-	ANA A
-	JZ DONE
+	LDA SHM$DATA		; get the result
+	ANA A				; returns number of bytes read
+	JZ DONE				; so zero means we're done
 	
 	MVI C, WRITEF
 	LXI D, FCB
-	CALL BDOS
+	CALL BDOS			; write the block to cp/m filesystem
 	ANA A
-	JZ XFERLP
+	JZ XFERLP			; 0=success
 	LXI H, STR$WRTERR
 	CALL STROUT
 	; FALL THROUGH TO DONE
 	
 DONE:
 	MVI A, CMD$CLOSEF
-	CALL DOCMD
+	CALL DOCMD			; close pi side file
 	MVI C, CLOSEF
-	LXI D, FCB
-	CALL BDOS
+	LXI D, FCB	
+	CALL BDOS			; close cp/m side file
 	RST 0
 	
 	
 DOCMD:
-	STA SHM$CMD
-	OUT 0
+	STA SHM$CMD			; save command to shm
+	OUT 0				; set request flag
 DOCMD$W:
 	IN 0
 	ANI 1
-	JNZ DOCMD$W
+	JNZ DOCMD$W			; wait for request flag to reset
 	RET
 	
 STROUT:
-	SHLD SHM$DATA
-	MVI A, CMD$STROUT
+	SHLD SHM$DATA		; hl = string address
+	MVI A, CMD$STROUT	; print string command
 	CALL DOCMD
 	RET
 	

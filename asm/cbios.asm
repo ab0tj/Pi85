@@ -52,7 +52,7 @@ wboote:	jmp	wboot		;warm start
 ;
 ;	4x 8MB removable drive devices
 ;	disk parameter header for disk 00
-dpbase:	dw	0000H,0000H
+dpbase:	dw	0000H,0000H		; storage medium is a flat file
 	dw	0000H,0000H
 	dw	dirbf,dpblk
 	dw	chk00,all00
@@ -184,32 +184,32 @@ loaderr:
 ;	to insert your own code
 ;
 const:	;console status, return 0ffh if character ready, 00h if not
-	lda shm$chrin
+	lda shm$chrin	; check chrin byte
 	ana a
-	rz
+	rz				; 0 means nothing came in
 	mvi a, 0ffh
 	ret
 ;
 conin:	;console character into register a
-	lda shm$chrin
+	lda shm$chrin	; check chrin byte
 	ana a
-	jz conin
-	mov b,a
-	xra a
-	sta shm$chrin
-	mov a,b
+	jz conin		; wait until something appears there
+	mov b,a			; save the byte
+	xra a			; a=0
+	sta shm$chrin	; zero the chrin byte so we know nothing is there next time
+	mov a,b			; recall the byte
 	ret
 ;
 conout: ;console character output from register c
-	mvi a, cmd$chrout
-	sta shm$cmd
-	mov a, c
-	sta shm$data           ; send the byte
-	out 0
+	mvi a, cmd$chrout	; chrout command
+	sta shm$cmd		; save to command byte
+	mov a, c		; get the char to send
+	sta shm$data    ; save at data location
+	out 0			; set the request flag
 conout$w:
 	in 0
 	ani 1
-	jnz conout$w
+	jnz conout$w	; wait for request to be processed
 	ret
 ;
 list:	;list character from register c
@@ -244,7 +244,7 @@ home:	;move to the track 00 position of current drive
 settrk:	;set track given by register c
 	mov l,c
 	mov h,b
-	shld shm$track
+	shld shm$track	; save in memory for later
 	ret
 ;
 seldsk:	;select disk given by register C
@@ -253,16 +253,16 @@ seldsk:	;select disk given by register C
 	cpi	4	;must be between 0 and 3
 	rnc		;no carry if 4,5,...
 ;	disk number is in the proper range
-	sta shm$data
-	mvi a,cmd$seldisk
+	sta shm$data		; track number in data field
+	mvi a,cmd$seldisk	; check that we can select this disk
 	sta shm$cmd
-	out 0
+	out 0				; set request flag
 seldsk$w:
 	in 0
-	ani 1
+	ani 1				; wait for it to change
 	jnz seldsk$w
 	lda shm$data
-	ana a
+	ana a				; 0=ok
 	rnz
 ;	compute proper disk parameter header address
 	mov	l,c	;L=disk number 0,1,2,3
@@ -277,15 +277,15 @@ seldsk$w:
 ;
 setsec:	;set sector given by register c
 	mov l,c
-	mvi h,0
-	shld shm$sect
+	mvi h,0				; pi85 is capable of 16 bit sector- but is cp/m?
+	shld shm$sect		; save in memory to be used later
 	ret
 ;
 sectran:
 	;translate the sector given by BC using the
 	;translate table given by DE
 	mov h,b
-	mov l,c
+	mov l,c				; don't translate as it doesn't help us here
 	inx h
 	ret		;with value in HL
 ;
@@ -309,7 +309,7 @@ waitio:	;enter here from read and write to perform the actual i/o
 ;	properly, and 01h if an error occurs during the read or write
 ;
 	sta shm$cmd
-	out 0
+	out 0		; by this point we should have already set params, so do the i/o
 waitio$w:
 	in 0
 	ani 1
@@ -318,7 +318,7 @@ waitio$w:
 	ret		;replaced when filled-in
 	
 print$str:
-	shld shm$data
+	shld shm$data		; for cbios to print strings
 	mvi a, cmd$strout
 	sta shm$cmd
 	out 0
